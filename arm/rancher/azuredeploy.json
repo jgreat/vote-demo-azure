@@ -1,0 +1,301 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "lkVnet": {
+      "type": "string",
+      "metadata": {
+        "description": "LeanKit Vnet designation"
+      }
+    },
+    "lkInst": {
+      "type": "string",
+      "metadata": {
+        "description": "LeanKit Instance Identifyer: df, admin, pd, wm..."
+      }
+    },
+    "lkRole": {
+      "type": "string",
+      "metadata": {
+        "description": "LeanKit Role"
+      }
+    },
+    "count": {
+      "type": "int",
+      "metadata": {
+        "description": "Number of nodes to create"
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "metadata": {
+        "description": "Size of vm. Run: 'azure vm sizes -l eastus' to see available sizes"
+      }
+    },
+    "updateGroup": {
+      "type": "string",
+      "metadata": {
+        "description": "Update group, a or b"
+      },
+      "defaultValue": "a"
+    },
+    "command": {
+      "type": "string",
+      "metadata": {
+        "description": "Docker Command to Run"
+      }
+    },
+    "rancherURL": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Rancher Url"
+      }
+    }
+  },
+  "variables": {
+    "vnetName": "[concat(parameters('lkVnet'), '-vnet')]",
+    "vnet": "[resourceId(variables('vnetName'), 'Microsoft.Network/virtualNetworks', variables('vnetName'))]",
+    "subnet": "[concat(variables('vnet'), '/subnets/', parameters('lkInst'))]",
+    "vmName": "[concat(parameters('lkVnet'), parameters('lkInst'), parameters('lkRole'))]",
+    "osStorageAccount": "[concat('lk', parameters('lkVnet'), parameters('lkRole'), 'plrs')]",
+    "filesStorageAccount": "[concat('lk', parameters('lkVnet'), parameters('lkRole'), 'lrs')]"
+  },
+  "resources": [{
+    "type": "Microsoft.Storage/storageAccounts",
+    "apiVersion": "2015-06-15",
+    "name": "[variables('osStorageAccount')]",
+    "location": "[resourceGroup().location]",
+    "properties": {
+      "accountType": "Premium_LRS"
+    }
+  }, {
+    "type": "Microsoft.Storage/storageAccounts",
+    "apiVersion": "2015-06-15",
+    "name": "[variables('filesStorageAccount')]",
+    "location": "[resourceGroup().location]",
+    "properties": {
+      "accountType": "Standard_LRS"
+    }
+  }, {
+    "type": "Microsoft.Compute/availabilitySets",
+    "name": "[concat(variables('vmName'), '-availabilitySet')]",
+    "apiVersion": "2015-06-15",
+    "location": "[resourceGroup().location]",
+    "tags": {
+      "displayName": "[concat(variables('vmName'), '-availabilitySet')]",
+      "lkVnet": "[parameters('lkVnet')]",
+      "lkInst": "[parameters('lkInst')]",
+      "lkRole": "[parameters('lkRole')]"
+    },
+    "properties": {}
+  }, {
+    "type": "Microsoft.Network/publicIPAddresses",
+    "name": "[concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '-publicIP')]",
+    "location": "[resourceGroup().location]",
+    "apiVersion": "2016-03-30",
+    "copy": {
+      "name": "[concat('publicIPAddresses-', parameters('updateGroup'))]",
+      "count": "[parameters('count')]"
+    },
+    "dependsOn": [],
+    "tags": {
+      "displayName": "[concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '-publicIP')]",
+      "lkVnet": "[parameters('lkVnet')]",
+      "lkInst": "[parameters('lkInst')]",
+      "lkRole": "[parameters('lkRole')]"
+    },
+    "properties": {
+      "publicIPAllocationMethod": "Dynamic",
+      "dnsSettings": {
+        "domainNameLabel": "[concat('lk-', variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'))]"
+      }
+    }
+  }, {
+    "type": "Microsoft.Network/networkSecurityGroups",
+    "name": "[concat(variables('vmName'), '-securityGroup')]",
+    "apiVersion": "2016-03-30",
+    "location": "[resourceGroup().location]",
+    "tags": {
+      "displayName": "[concat(variables('vmName'), '-securityGroup')]",
+      "lkVnet": "[parameters('lkVnet')]",
+      "lkInst": "[parameters('lkInst')]",
+      "lkRole": "[parameters('lkRole')]"
+    },
+    "properties": {
+      "securityRules": [{
+        "name": "https-inbound",
+        "properties": {
+          "description": "Allow https access from Internet",
+          "protocol": "TCP",
+          "sourcePortRange": "*",
+          "destinationPortRange": "443",
+          "sourceAddressPrefix": "Internet",
+          "destinationAddressPrefix": "*",
+          "access": "allow",
+          "priority": "1002",
+          "direction": "inbound"
+        }
+      }, {
+        "name": "http-inbound",
+        "properties": {
+          "description": "Allow https access from Internet",
+          "protocol": "TCP",
+          "sourcePortRange": "*",
+          "destinationPortRange": "80",
+          "sourceAddressPrefix": "Internet",
+          "destinationAddressPrefix": "*",
+          "access": "allow",
+          "priority": "1003",
+          "direction": "inbound"
+        }
+      }, {
+        "name": "ssh-office",
+        "properties": {
+          "description": "Allow https access from Internet",
+          "protocol": "TCP",
+          "sourcePortRange": "*",
+          "destinationPortRange": "22",
+          "sourceAddressPrefix": "50.207.5.146/32",
+          "destinationAddressPrefix": "*",
+          "access": "allow",
+          "priority": "1004",
+          "direction": "inbound"
+        }
+      }, {
+        "name": "ssh-home",
+        "properties": {
+          "description": "Allow https access from Internet",
+          "protocol": "TCP",
+          "sourcePortRange": "*",
+          "destinationPortRange": "22",
+          "sourceAddressPrefix": "75.30.64.85/32",
+          "destinationAddressPrefix": "*",
+          "access": "allow",
+          "priority": "1005",
+          "direction": "inbound"
+        }
+      }]
+    }
+  }, {
+    "type": "Microsoft.Network/networkInterfaces",
+    "name": "[concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '-networkInterface')]",
+    "location": "[resourceGroup().location]",
+    "apiVersion": "2016-03-30",
+    "copy": {
+      "name": "[concat('networkInterfaces-', parameters('updateGroup'))]",
+      "count": "[parameters('count')]"
+    },
+    "dependsOn": [
+      "[concat('publicIPAddresses-', parameters('updateGroup'))]",
+      "[concat('Microsoft.Network/networkSecurityGroups/', variables('vmName'), '-securityGroup')]"
+    ],
+    "tags": {
+      "displayName": "[concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '-networkInterface')]",
+      "lkVnet": "[parameters('lkVnet')]",
+      "lkInst": "[parameters('lkInst')]",
+      "lkRole": "[parameters('lkRole')]"
+    },
+    "properties": {
+      "networkSecurityGroup": {
+        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('vmName'), '-securityGroup'))]"
+      },
+      "ipConfigurations": [{
+        "name": "ipconfig1",
+        "properties": {
+          "privateIPAllocationMethod": "Dynamic",
+          "subnet": {
+            "id": "[variables('subnet')]"
+          },
+          "publicIPAddress": {
+            "id": "[resourceId('Microsoft.Network/publicIPAddresses', concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '-publicIP'))]"
+          }
+        }
+      }]
+    }
+  }, {
+    "type": "Microsoft.Compute/virtualMachines",
+    "name": "[concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'))]",
+    "location": "[resourceGroup().location]",
+    "apiVersion": "2015-06-15",
+    "tags": {
+      "displayName": "[variables('vmName')]",
+      "lkVnet": "[parameters('lkVnet')]",
+      "lkInst": "[parameters('lkInst')]",
+      "lkRole": "[parameters('lkRole')]",
+      "lkId": "[concat(padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'))]"
+    },
+    "copy": {
+      "name": "[concat('vm-', parameters('updateGroup'))]",
+      "count": "[parameters('count')]"
+    },
+    "dependsOn": [
+      "[concat('networkInterfaces-', parameters('updateGroup'))]",
+      "[concat('Microsoft.Compute/availabilitySets/', variables('vmName'), '-availabilitySet')]",
+      "[concat('Microsoft.Storage/storageAccounts/', variables('osStorageAccount'))]",
+      "[concat('Microsoft.Storage/storageAccounts/', variables('filesStorageAccount'))]"
+    ],
+    "properties": {
+      "hardwareProfile": {
+        "vmSize": "[parameters('vmSize')]"
+      },
+      "networkProfile": {
+        "networkInterfaces": [{
+          "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '-networkInterface'))]"
+        }]
+      },
+      "availabilitySet": {
+        "id": "[resourceId('Microsoft.Compute/availabilitySets', concat(variables('vmName'), '-availabilitySet'))]"
+      },
+      "osProfile": {
+        "customData": "[base64(concat('#cloud-config\n', 'write_files:\n', '  - path: /etc/systemd/system/docker.service.d/docker.conf\n', '    owner: root:root\n', '    permissions: 0644\n', '    content: |\n', '      [Service]\n', '      ExecStart=\n', '      ExecStart=/usr/bin/docker daemon --storage-driver=zfs --host=unix:///var/run/docker.sock --host=fd://\n', 'runcmd:\n', '  - echo 127.0.1.1 ', variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '.leankitdev.com ', variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '\n', '  - apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D\n', '  - echo \"deb https://apt.dockerproject.org/repo ubuntu-xenial main\" > /etc/apt/sources.list.d/docker.list\n', '  - apt-get update\n', '  - DEBIAN_FRONTEND=noninteractive apt-get install -y docker-engine=1.11.2-0~xenial zfsutils-linux\n', '  - apt-mark hold docker-engine\n', '  - service docker stop\n', '  - rm -rf /var/lib/docker\n', '  - mkdir /var/lib/docker\n', '  - zpool create -f zpool-docker /dev/sdc\n', '  - zfs create -o mountpoint=/var/lib/docker -o dedup=off zpool-docker/docker\n', '  - service docker start\n', '  - ', parameters('command'), parameters('rancherURL'), '\n'))]",
+        "linuxConfiguration": {
+          "disablePasswordAuthentication": "true",
+          "ssh": {
+            "publicKeys": [{
+              "keyData": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDIx2lzvnK/K8+fEl041ohQc7UeRzoHBj5bw6kn1aVAK67JTTqfZfAaXwwufo71ulLZ28k00uXgxVCDfmd6R93w+3ul851IG+xMev8jvRp4wWzxNh2RjbL3kTMDnE5o4Raglcp/W6aab78MoY4SRpBtMxZwL/+aCN2c7y+aAB+NhXKiLfvtGwfUQ3aNC57gJP/QPoZdFQblMfYe+dhnpRZjxYV/Hk031VI/Jo1baaPcd+0waoVyIIY8yJa0xHO40HacwJLeUjd5i6v+JZuTdAdqwTVGQdu0E0Vk5gg4CPK3W3ARWOrHOkWVPplJL+G2QgHOvZVTIdYPmB65s5LsvspJ",
+              "path": "/home/lkdevops/.ssh/authorized_keys"
+            }]
+          }
+        },
+        "computerName": "[concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'))]",
+        "adminUsername": "lkdevops",
+        "adminPassword": ""
+      },
+      "storageProfile": {
+        "imageReference": {
+          "publisher": "Canonical",
+          "offer": "UbuntuServer",
+          "sku": "16.04.0-LTS",
+          "version": "latest"
+        },
+        "osDisk": {
+          "name": "[concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '-osDisk')]",
+          "vhd": {
+            "uri": "[concat('https://', variables('osStorageAccount'), '.blob.core.windows.net/', variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '/osDisk.vhd')]"
+          },
+          "diskSizeGB": "128",
+          "caching": "ReadWrite",
+          "createOption": "FromImage"
+        },
+        "dataDisks": [{
+          "name": "[concat(variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '-dockerDisk01')]",
+          "lun": 0,
+          "vhd": {
+            "uri": "[concat('https://', variables('osStorageAccount'), '.blob.core.windows.net/', variables('vmName'), padLeft(copyIndex(1), 2, '0'), parameters('updateGroup'), '/dockerDisk01.vhd')]"
+          },
+          "caching": "None",
+          "createOption": "Empty",
+          "diskSizeGB": "128"
+        }]
+      },
+      "diagnosticsProfile": {
+        "bootDiagnostics": {
+          "enabled": true,
+          "storageUri": "[concat('https://', variables('filesStorageAccount'), '.blob.core.windows.net')]"
+        }
+      }
+    },
+    "resources": []
+  }],
+  "outputs": {}
+}

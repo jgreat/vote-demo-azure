@@ -1,0 +1,65 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json",
+  "contentVersion": "1.0.0.0",
+  "parameters": {},
+  "variables": {
+    "vnet": "jgreat1",
+    "instanceCIDR": "10.200.1.0/24",
+    "ipVnetPrefix": "10.200"
+  },
+  "resources": [{
+    "apiVersion": "2015-06-15",
+    "type": "Microsoft.Network/virtualNetworks",
+    "name": "[concat(variables('vnet'), '-vnet')]",
+    "location": "[resourceGroup().location]",
+    "dependsOn": [
+      "[concat('Microsoft.Network/networkSecurityGroups/', variables('vnet'), '-demo-networkSecurityGroup')]"
+    ],
+    "properties": {
+      "addressSpace": {
+        "addressPrefixes": [
+          "[concat(variables('ipVnetPrefix'), '.0.0/16')]"
+        ]
+      },
+      "dhcpOptions": {},
+      "subnets": [{
+        "name": "appGateway",
+        "properties": {
+          "addressPrefix": "[concat(variables('ipVnetPrefix'), '.0.0/24')]",
+          "networkSecurityGroup": {
+            "id": "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('vnet'), '-demo-networkSecurityGroup'))]"
+          }
+        }
+      }, {
+        "name": "demo",
+        "properties": {
+          "addressPrefix": "[concat(variables('ipVnetPrefix'), '.1.0/24')]",
+          "networkSecurityGroup": {
+            "id": "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('vnet'), '-demo-networkSecurityGroup'))]"
+          }
+        }
+      }]
+    }
+  }, {
+    "apiVersion": "2016-03-30",
+    "type": "Microsoft.Network/networkSecurityGroups",
+    "name": "[concat(variables('vnet'), '-demo-networkSecurityGroup')]",
+    "location": "[resourceGroup().location]",
+    "properties": {
+      "securityRules": [{
+        "name": "Allow-Internet",
+        "properties": {
+          "description": "Allow Internet Inbound",
+          "protocol": "*",
+          "sourcePortRange": "*",
+          "destinationPortRange": "*",
+          "sourceAddressPrefix": "Internet",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "priority": 100,
+          "direction": "Inbound"
+        }
+      }]
+    }
+  }]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "lkVnet": {
+      "value": "jgreat1"
+    },
+    "lkInst": {
+      "value": "demo"
+    },
+    "lkRole": {
+      "value": "rancher"
+    },
+    "count": {
+      "value": 1
+    },
+    "rancherURL": {
+      "value": ""
+    },
+    "command": {
+      "value": "\"docker run -d --name rancher-server --restart=unless-stopped -p 8080:8080 rancher/server\""
+    },
+    "vmSize": {
+      "value": "Standard_DS1_v2"
+    }
+  }
+}

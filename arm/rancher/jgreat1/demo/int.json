@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "lkVnet": {
+      "value": "jgreat1"
+    },
+    "lkInst": {
+      "value": "demo"
+    },
+    "lkRole": {
+      "value": "int"
+    },
+    "count": {
+      "value": 1
+    },
+    "rancherURL": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/9126df1f-727c-4180-a023-97e3e2bd9be0/resourceGroups/jgreat1-keyvault/providers/Microsoft.KeyVault/vaults/jgreat1-keyvault"
+        },
+        "secretName": "RancherInt"
+      }
+    },
+    "command": {
+      "value": "docker run -d --privileged -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/rancher:/var/lib/rancher rancher/agent:v1.0.2 "
+    },
+    "vmSize": {
+      "value": "Standard_DS1_v2"
+    }
+  }
+}
